@@ -21,7 +21,7 @@ library(parallel)
 
 #### ---- load data ---- ####
 ### ---- start MySQL ---- #####
-con <- dbConnect( MySQL(), host = "localhost", dbname = "cell_line", user = "root" , password = "root" )  ## 杈撳叆鐢ㄦ埛鐨凪ysSQL鐢ㄦ埛鍚嶅拰瀵嗙爜
+con <- dbConnect( MySQL(), host = "localhost", dbname = "cell_line", user = "root" , password = "root" )  ##
 
 DEMETER_score <- dbGetQuery(con, "select * from DEMETER_score;" )
 cell_line <- dbGetQuery( con, "select distinct(cell_line) from DEMETER_score;" )
@@ -52,7 +52,7 @@ df[ is.na(df) ] <- 0.5
 
 infile <- commandArgs(TRUE)
 
-gene_name = infile
+gene_name = "gene_name" 
 
 #### ---- feature selection ---- ####
 DEMETER_gene <- DEMETER_score[ which(DEMETER_score$gene == gene_name), c(2, 4) ]
@@ -80,7 +80,7 @@ data$eg <- as.factor(data$eg)
 
 col_num <- ncol(data)
 ctrl= rfeControl(functions = rfFuncs, method = "cv",number = 10)
-results <- rfe(data2, data[ ,col_num ], sizes = c(1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000), rfeControl=ctrl) ## 鏍规嵁鐗瑰緛鏁伴噺淇敼sizes 
+results <- rfe(data2, data[ ,col_num ], sizes = c(1000, 2000, 3000, 4000, 5000, 6000, 7000, 8000, 9000, 10000), rfeControl=ctrl) 
 
 selected_features <- data.frame( results$fit$importance )
 selected_features <- data[ ,c(colnames(data)[which(selected_features$MeanDecreaseGini >= 0) +1], "eg")]
@@ -90,6 +90,7 @@ names(selected_features)[1] <- "cell_line"
 selected_features <- cbind(selected_features[ ,which(colSums(selected_features[2:(ncol(selected_features)-1)]) >  0 )], selected_features[ ,ncol(selected_features)])
 names(selected_features)[ncol(selected_features)] <- "eg"
 
+write.table(selected_feature, "feature_path",col.names = T , row.names = F, quote = F, sep = "\t")
 
 #### ---- machine learning ----
 ## --- start h2o ---
@@ -198,10 +199,19 @@ result_data <- data.frame( result_data )
 
 ### -- save the predictive model ---
 if ( round( perf.test@metrics$AUC, 3) >= 0.8 ){
-  model_path <- h2o.saveModel( model.5, path = "", force = FALSE )
-  model_name <- paste( pwd2, gene_name, ".path", sep = "" )
-  write.csv(model_path, model_name, col.names = F, row.names = F )
-  file_name = paste( gene_name, ".list", sep = "" )
-  write.table(result_data, file_name, col.names = T, row.names = F, quote = F, sep = "\t")
+    model_path <- h2o.saveModel(model.5,path = "model_path",force = FALSE) ### save models 
+    model_name <- paste(pwd2,gene_name,".path",sep = "")
+    write.csv(model_path,model_name,col.names = F,row.names = F)
+  }
+  features <- model.5@model$variable_importances
+  features <- features[order(-features$percentage)[1:10],1]
+  result_data <- list(gene_name,perf.5.test[1,-1],perf.5.test[2,-1],round( perf.train@metrics$AUC, 3),
+                      round( perf.test@metrics$AUC, 3),ncol(dat5)-1,nrow(dat5),nrow(dat5[which(dat5$eg == 'Y'),]),features[1],features[2],
+                      features[3],features[4],features[5],features[6],features[7],features[8],features[9],features[10])
+  names(result_data) <- c("gene_name","test_N","test_Y","train_AUC","test_AUC","features_num","cell_line_num","eg_num",
+                          "feature1","feature2","feature3","feature4","feature5","feature6","feature7","feature8","feature9","feature10")
+  result_data <- data.frame(result_data)
+  file_name = paste(pwd2,gene_name,".list",sep = "")
+  write.table(result_data,file_name,col.names = T,row.names = F,quote = F,sep = "\t")
   
 }
