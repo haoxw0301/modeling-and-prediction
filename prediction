@@ -1,7 +1,0 @@
-library(h2o)
-
-
-#### ---- start h2o ----
-h2o.shutdown( prompt = F ); 
-localH2O <- h2o.init(ip = "localhost", port = 50013, nthreads = 10,  startH2O = TRUE, max_mem_size = "100G")
-
